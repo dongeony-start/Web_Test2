@@ -7,13 +7,12 @@
     <style>
         body { font-family: 'Arial', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background-color: #f4f7f6; position: relative; }
         
-        /* 국기 표시 스타일 */
         #flag-container {
             position: absolute;
             top: 20px;
             right: 20px;
             text-align: center;
-            display: none; /* 초기에는 숨김 */
+            display: none; 
         }
         #flag-img {
             width: 100px;
@@ -53,13 +52,20 @@
     <button onclick="updatePage()">찾기</button>
 
     <div id="map-container">
-        <p id="placeholder-text">결과가 여기에 나타납니다.</p>
-    </div>
+        </div>
 </div>
 
 <script>
-    async function updatePage() {
-        const destination = document.getElementById('destination').value;
+    // 페이지가 로드될 때 실행
+    window.onload = function() {
+        updatePage('South Korea'); // 기본값으로 한국 설정
+    };
+
+    async function updatePage(defaultLocation) {
+        const inputVal = document.getElementById('destination').value;
+        // 함수 호출 시 인자가 있으면(초기 로드) 그 값을 사용, 없으면 입력창 값 사용
+        const destination = defaultLocation || inputVal;
+        
         const mapContainer = document.getElementById('map-container');
         const flagContainer = document.getElementById('flag-container');
         const flagImg = document.getElementById('flag-img');
@@ -70,26 +76,24 @@
             return;
         }
 
-        // 1. 지도 업데이트 (Google Maps Embed)
+        // 1. 지도 업데이트
         const mapUrl = `https://www.google.com/maps?q=${encodeURIComponent(destination)}&output=embed`;
         mapContainer.innerHTML = `<iframe src="${mapUrl}" allowfullscreen></iframe>`;
 
-        // 2. 국기 정보 가져오기 (Rest Countries API)
+        // 2. 국기 정보 가져오기 (초기 로드 시 한국 국기는 선택사항)
         try {
-            // 입력값으로 국가 정보 검색
             const response = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(destination)}`);
             const data = await response.json();
 
             if (data && data.length > 0) {
                 const country = data[0];
-                flagImg.src = country.flags.png; // 국기 이미지 URL
+                flagImg.src = country.flags.png;
                 countryNameText.innerText = country.translations.kor ? country.translations.kor.common : country.name.common;
-                flagContainer.style.display = 'block'; // 국기 영역 보이기
+                flagContainer.style.display = 'block';
             } else {
-                flagContainer.style.display = 'none'; // 찾지 못한 경우 숨김
+                flagContainer.style.display = 'none';
             }
         } catch (error) {
-            console.error("국기 정보를 가져오는 데 실패했습니다.", error);
             flagContainer.style.display = 'none';
         }
     }
@@ -97,3 +101,4 @@
 
 </body>
 </html>
+
