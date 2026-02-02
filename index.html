@@ -2,51 +2,58 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>K-Stock 멀티 차트 분석기</title>
+    <title>K-Stock 실시간 차트</title>
     <style>
-        body { font-family: 'Pretendard', sans-serif; margin: 0; padding: 20px; background-color: #131722; color: white; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .search-area { display: flex; gap: 15px; margin-bottom: 20px; background: #1e222d; padding: 20px; border-radius: 10px; }
-        .input-group { flex: 1; }
-        label { display: block; margin-bottom: 8px; font-size: 0.9em; color: #848e9c; }
-        input { width: 100%; padding: 12px; border-radius: 5px; border: 1px solid #363c4e; background: #2a2e39; color: white; box-sizing: border-box; }
-        
-        /* 듀얼 차트 레이아웃 */
-        .chart-wrapper { display: flex; gap: 15px; height: 600px; }
-        .chart-box { flex: 1; background: #1e222d; border-radius: 10px; overflow: hidden; position: relative; }
-        .chart-title { position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.5); padding: 5px 10px; border-radius: 4px; font-size: 0.8em; }
+        body { font-family: sans-serif; margin: 0; background-color: #131722; color: white; padding: 20px; }
+        .search-bar { margin-bottom: 20px; text-align: center; }
+        input { padding: 10px; width: 250px; border-radius: 4px; border: 1px solid #363c4e; background: #1e222d; color: white; }
+        button { padding: 10px 20px; background: #2962ff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        /* 차트가 들어갈 공간의 높이를 반드시 지정해야 합니다 */
+        #chart_area { height: 600px; width: 100%; margin-top: 10px; border: 1px solid #363c4e; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>📊 K-Stock 멀티 분석 대시보드</h2>
-    
-    <div class="search-area">
-        <div class="input-group">
-            <label>차트 1 (이름 또는 코드)</label>
-            <input type="text" id="input1" placeholder="예: 삼성전자 또는 005930" onchange="updateCharts()">
-        </div>
-        <div class="input-group">
-            <label>차트 2 (비교 종목)</label>
-            <input type="text" id="input2" placeholder="예: SK하이닉스 또는 000660" onchange="updateCharts()">
-        </div>
+    <div class="search-bar">
+        <h2>📈 종목 검색</h2>
+        <input type="text" id="targetCode" placeholder="종목코드 6자리 (예: 005930)">
+        <button onclick="displayStock()">차트 보기</button>
     </div>
 
-    <div class="chart-wrapper">
-        <div class="chart-box">
-            <div id="tv_chart_1" style="height: 100%;"></div>
-        </div>
-        <div class="chart-box">
-            <div id="tv_chart_2" style="height: 100%;"></div>
-        </div>
-    </div>
-</div>
+    <div id="chart_area"></div>
 
-<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-<script>
-    // 1. 종목 이름-코드 매핑 사전
-    const stockDict = {
-        "삼성전자": "005930",
-        "SK하이닉스": "000660",
-        "현대차": "0053
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+
+    <script>
+        // 차트를 그리는 함수
+        function displayStock() {
+            let code = document.getElementById('targetCode').value.trim();
+            
+            // 아무것도 입력 안 했을 때 기본값 (삼성전자)
+            if (code === "") code = "005930";
+
+            // 이전 차트를 지우고 새로 그리기 위해 내부를 비움
+            document.getElementById('chart_area').innerHTML = '<div id="tv_widget"></div>';
+
+            new TradingView.widget({
+                "autosize": true,
+                "symbol": "KRX:" + code,
+                "interval": "D",
+                "timezone": "Asia/Seoul",
+                "theme": "dark",
+                "style": "1",
+                "locale": "ko",
+                "toolbar_bg": "#f1f3f6",
+                "enable_publishing": false,
+                "allow_symbol_change": true,
+                "container_id": "tv_widget" // 이 ID가 위 DIV의 ID와 같아야 함
+            });
+        }
+
+        // 페이지가 처음 열릴 때 자동으로 삼성전자 차트 보여주기
+        window.onload = function() {
+            displayStock();
+        };
+    </script>
+</body>
+</html>
