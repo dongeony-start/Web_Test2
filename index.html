@@ -2,125 +2,105 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global Travel Planner with Calendar</title>
-    
+    <title>Global Travel Planner</title>
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
     <style>
-        body { font-family: 'Pretendard', sans-serif; margin: 0; background-color: #f1f3f5; }
-        
-        /* 2단 레이아웃 설정 */
-        .wrapper { display: flex; height: 100vh; overflow: hidden; }
-        
-        /* 왼쪽 사이드바 (달력) */
-        .sidebar { width: 350px; background: white; padding: 20px; border-right: 1px solid #ddd; overflow-y: auto; }
-        
-        /* 오른쪽 메인 (지도 및 검색) */
+        body { font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
+        .sidebar { width: 350px; padding: 20px; border-right: 1px solid #ddd; overflow-y: auto; }
         .main-content { flex: 1; padding: 20px; overflow-y: auto; }
-        
-        .search-section { margin-bottom: 15px; }
-        #cityInput { width: 100%; padding: 12px; border: 2px solid #4285F4; border-radius: 8px; box-sizing: border-box; }
-        
-        #map { height: 400px; width: 100%; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        
-        .recommendations { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
-        .hotel-card { background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #34a853; font-size: 0.9em; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        
-        /* 달력 크기 조절 */
-        #calendar { font-size: 0.8em; }
+        #map { height: 400px; width: 100%; border-radius: 10px; margin: 10px 0; }
+        .hotel-card { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 8px; }
+        #cityInput { width: 100%; padding: 10px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
-<div class="wrapper">
     <div class="sidebar">
-        <h3>📅 여행 일정</h3>
+        <h3>📅 여행 날짜 선택</h3>
         <div id="calendar"></div>
-        <p style="margin-top:20px; font-size: 0.85em; color: #666;">* 날짜를 클릭하여 일정을 계획해 보세요.</p>
     </div>
 
     <div class="main-content">
-        <h2>🌍 전 세계 도시 여행 플래너</h2>
-        <div class="search-section">
-            <input type="text" id="cityInput" placeholder="도시 또는 지역을 입력하세요">
-        </div>
-
+        <input type="text" id="cityInput" placeholder="도시를 검색하세요">
         <div id="map"></div>
-
-        <h3>🏠 추천 숙박 시설</h3>
-        <div id="hotelList" class="recommendations">
-            <p class="no-data">도시를 검색하면 추천 숙소가 나타납니다.</p>
+        <div style="display:flex; justify-content: space-between;">
+            <h3>🏠 숙소 목록 <span id="selectedDateText"></span></h3>
+            <select id="sortOption" onchange="handleSort()">
+                <option value="rating">평점순</option>
+                <option value="priceAsc">가격 낮은순</option>
+            </select>
         </div>
+        <div id="hotelList"></div>
     </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD55siqdEZZXoowLK9t8hq5KYl1MpnKPgQ&libraries=places&callback=initApp" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD55siqdEZZXoowLK9t8hq5KYl1MpnKPgQ&libraries=places"></script>
 
-<script>
-    let map, marker, autocomplete;
+    <script>
+        let map, service, currentHotels = [];
 
-    // 초기화 통합 함수
-    function initApp() {
-        initMap();
-        initCalendar();
-    }
+        // 페이지가 열리면 실행
+        window.onload = function() {
+            // 지도 초기화
+            const seoul = { lat: 37.5665, lng: 126.9780 };
+            map = new google.maps.Map(document.getElementById('map'), { zoom: 12, center: seoul });
+            service = new google.maps.places.PlacesService(map);
 
-    // 지도 초기화
-    function initMap() {
-        const defaultLoc = { lat: 37.5665, lng: 126.9780 };
-        map = new google.maps.Map(document.getElementById('map'), {
-            zoom: 12, center: defaultLoc
-        });
-        marker = new google.maps.Marker({ map: map, position: defaultLoc });
+            // 자동완성 설정
+            const input = document.getElementById('cityInput');
+            const autocomplete = new google.maps.places.Autocomplete(input, { types: ['(cities)'] });
+            autocomplete.addListener('place_changed', () => {
+                const place = autocomplete.getPlace();
+                if (place.geometry) {
+                    map.setCenter(place.geometry.location);
+                    searchHotels(place.geometry.location);
+                }
+            });
 
-        const input = document.getElementById('cityInput');
-        autocomplete = new google.maps.places.Autocomplete(input, { types: ['(cities)'] });
-        autocomplete.addListener('place_changed', onPlaceChanged);
-    }
+            // 달력 초기화
+            const calendarEl = document.getElementById('calendar');
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                dateClick: (info) => {
+                    document.getElementById('selectedDateText').innerText = ` - ${info.dateStr}`;
+                    searchHotels(map.getCenter()); // 날짜 선택 시 현재 지도 중심 기준으로 검색
+                }
+            });
+            calendar.render();
+        };
 
-    // 달력 초기화
-    function initCalendar() {
-        const calendarEl = document.getElementById('calendar');
-        const calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            locale: 'ko',
-            height: 'auto',
-            dateClick: function(info) {
-                alert('선택한 날짜: ' + info.dateStr + '\n이 날짜에 여행을 계획할까요?');
-            }
-        });
-        calendar.render();
-    }
+        function searchHotels(location) {
+            const request = { location: location, radius: '3000', type: ['lodging'] };
+            service.nearbySearch(request, (results, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK) {
+                    currentHotels = results.map(p => ({
+                        name: p.name,
+                        rating: p.rating || 0,
+                        price: Math.floor(Math.random() * 200000) + 50000,
+                        address: p.vicinity
+                    }));
+                    handleSort();
+                }
+            });
+        }
 
-    function onPlaceChanged() {
-        const place = autocomplete.getPlace();
-        if (!place.geometry) return;
+        function handleSort() {
+            const option = document.getElementById('sortOption').value;
+            if (option === "rating") currentHotels.sort((a, b) => b.rating - a.rating);
+            else currentHotels.sort((a, b) => a.price - b.price);
+            render();
+        }
 
-        map.setCenter(place.geometry.location);
-        map.setZoom(13);
-        marker.setPosition(place.geometry.location);
-        
-        displayHotels(place.name);
-    }
-
-    function displayHotels(cityName) {
-        const hotelList = document.getElementById('hotelList');
-        // 간단한 예시 데이터 (실제 서비스 시 API 연동)
-        hotelList.innerHTML = `
-            <div class="hotel-card">
-                <h3>${cityName} 럭셔리 호텔</h3>
-                <p>최저가: 300,000원~</p>
-                <p>평점: ⭐ 4.8</p>
-            </div>
-            <div class="hotel-card">
-                <h3>${cityName} 가성비 숙소</h3>
-                <p>최저가: 120,000원~</p>
-                <p>평점: ⭐ 4.2</p>
-            </div>
-        `;
-    }
-</script>
-
+        function render() {
+            const list = document.getElementById('hotelList');
+            list.innerHTML = currentHotels.map(h => `
+                <div class="hotel-card">
+                    <h4>${h.name}</h4>
+                    <p>⭐ ${h.rating} | 💰 ${h.price.toLocaleString()}원</p>
+                    <p style="font-size:12px; color:gray;">${h.address}</p>
+                </div>
+            `).join('');
+        }
+    </script>
 </body>
 </html>
