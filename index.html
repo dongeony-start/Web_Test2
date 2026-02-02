@@ -2,93 +2,72 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>간단한 벽돌 깨기 게임</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-Stock 실시간 차트 검색기</title>
     <style>
-        body { background: #f0f0f0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        canvas { background: #fff; border: 2px solid #333; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
-        h1 { font-family: sans-serif; color: #333; }
+        body { font-family: 'Pretendard', sans-serif; margin: 0; padding: 20px; background-color: #131722; color: white; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { flex: 1; padding: 12px; border-radius: 5px; border: 1px solid #363c4e; background: #1e222d; color: white; }
+        button { padding: 12px 24px; background: #2962ff; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #1e4bd8; }
+        #chart-container { height: 600px; width: 100%; border-radius: 10px; overflow: hidden; }
+        .info-text { margin-top: 10px; font-size: 0.9em; color: #848e9c; }
     </style>
 </head>
 <body>
-    <h1>Brick Breaker Game</h1>
-    <canvas id="gameCanvas" width="480" height="320"></canvas>
 
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+<div class="container">
+    <h2>📈 한국 주식 실시간 차트</h2>
+    <div class="search-box">
+        <input type="text" id="stockCode" placeholder="종목 코드를 입력하세요 (예: 005930)">
+        <button onclick="updateChart()">차트 보기</button>
+    </div>
 
-        // 1. 게임 설정 변수
-        let x = canvas.width / 2;
-        let y = canvas.height - 30;
-        let dx = 2; // 공의 x축 이동 속도
-        let dy = -2; // 공의 y축 이동 속도
-        const ballRadius = 10;
+    <div id="chart-container">
+        <div id="tradingview_widget"></div>
+    </div>
 
-        const paddleHeight = 10;
-        const paddleWidth = 75;
-        let paddleX = (canvas.width - paddleWidth) / 2;
-        let rightPressed = false;
-        let leftPressed = false;
+    <p class="info-text">* 삼성전자: 005930, SK하이닉스: 000660, 현대차: 005380</p>
+</div>
 
-        // 2. 키보드 이벤트 리스너
-        document.addEventListener("keydown", keyDownHandler);
-        document.addEventListener("keyup", keyUpHandler);
+<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 
-        function keyDownHandler(e) {
-            if(e.key == "Right" || e.key == "ArrowRight") rightPressed = true;
-            else if(e.key == "Left" || e.key == "ArrowLeft") leftPressed = true;
+<script>
+    // 페이지 로드 시 기본적으로 삼성전자 차트 표시
+    let currentSymbol = "KRX:005930";
+
+    function loadChart(symbol) {
+        new TradingView.widget({
+            "autosize": true,
+            "symbol": symbol,
+            "interval": "D",
+            "timezone": "Asia/Seoul",
+            "theme": "dark",
+            "style": "1",
+            "locale": "ko",
+            "toolbar_bg": "#f1f3f6",
+            "enable_publishing": false,
+            "allow_symbol_change": true,
+            "container_id": "tradingview_widget"
+        });
+    }
+
+    function updateChart() {
+        const code = document.getElementById('stockCode').value.trim();
+        if (code === "") {
+            alert("종목 코드를 입력해 주세요.");
+            return;
         }
+        
+        // 한국 거래소 코드 형식으로 변환 (KRX:005930)
+        const formattedSymbol = "KRX:" + code;
+        loadChart(formattedSymbol);
+    }
 
-        function keyUpHandler(e) {
-            if(e.key == "Right" || e.key == "ArrowRight") rightPressed = false;
-            else if(e.key == "Left" || e.key == "ArrowLeft") leftPressed = false;
-        }
+    // 초기 실행
+    loadChart(currentSymbol);
+</script>
 
-        // 3. 그리기 함수들
-        function drawBall() {
-            ctx.beginPath();
-            ctx.arc(x, y, ballRadius, 0, Math.PI * 2);
-            ctx.fillStyle = "#0095DD";
-            ctx.fill();
-            ctx.closePath();
-        }
-
-        function drawPaddle() {
-            ctx.beginPath();
-            ctx.rect(paddleX, canvas.height - paddleHeight, paddleWidth, paddleHeight);
-            ctx.fillStyle = "#0095DD";
-            ctx.fill();
-            ctx.closePath();
-        }
-
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height); // 이전 프레임 지우기
-            drawBall();
-            drawPaddle();
-
-            // 벽 충돌 감지
-            if(x + dx > canvas.width - ballRadius || x + dx < ballRadius) dx = -dx;
-            if(y + dy < ballRadius) dy = -dy;
-            else if(y + dy > canvas.height - ballRadius) {
-                if(x > paddleX && x < paddleX + paddleWidth) {
-                    dy = -dy; // 패들에 닿으면 튕김
-                } else {
-                    alert("GAME OVER");
-                    document.location.reload();
-                    return;
-                }
-            }
-
-            // 패들 이동
-            if(rightPressed && paddleX < canvas.width - paddleWidth) paddleX += 7;
-            else if(leftPressed && paddleX > 0) paddleX -= 7;
-
-            x += dx;
-            y += dy;
-            requestAnimationFrame(draw); // 다음 프레임 예약
-        }
-
-        draw(); // 게임 시작
-    </script>
 </body>
 </html>
