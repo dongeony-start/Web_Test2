@@ -3,30 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Travel Planner - Google Maps 버전</title>
+    <title>Global Travel Planner</title>
     <style>
         body { font-family: 'Pretendard', sans-serif; margin: 0; padding: 20px; background-color: #f1f3f5; }
         .container { max-width: 900px; margin: 0 auto; }
-        .search-section { display: flex; gap: 10px; margin-bottom: 20px; }
-        input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 8px; }
-        button { padding: 12px 24px; background-color: #4285F4; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .search-section { margin-bottom: 20px; }
+        /* 자동완성 입력창 스타일 */
+        #cityInput { width: 100%; padding: 15px; border: 2px solid #4285F4; border-radius: 8px; font-size: 16px; box-sizing: border-box; }
         
-        /* 구글 맵 영역 */
         #map { height: 450px; width: 100%; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         
         .recommendations { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
-        .hotel-card { background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #4285F4; }
-        .hotel-card h3 { margin: 0 0 10px 0; font-size: 1.1em; }
-        .price { color: #d93025; font-weight: bold; }
+        .hotel-card { background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #34a853; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .no-data { grid-column: 1 / -1; text-align: center; color: #666; padding: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>🗺️ Google Maps 여행 플래너</h2>
+    <h2>🌎 전 세계 도시 여행 플래너</h2>
     <div class="search-section">
-        <input type="text" id="cityInput" placeholder="도시 입력 (서울 또는 파리)">
-        <button onclick="searchTrip()">도시 검색</button>
+        <input type="text" id="cityInput" placeholder="도시 또는 지역을 입력하세요 (예: New York, 도쿄)">
     </div>
 
     <div id="map"></div>
@@ -34,70 +31,78 @@
     <div id="hotelList" class="recommendations"></div>
 </div>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD55siqdEZZXoowLK9t8hq5KYl1MpnKPgQ&callback=initMap" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=places&callback=initMap" async defer></script>
 
 <script>
     let map;
     let marker;
+    let autocomplete;
 
-    // 지도 초기화 함수 (API 로드 후 실행됨)
+    // 기존 샘플 데이터
+    const hotelData = {
+        "Seoul": [{ name: "시그니엘 서울", price: "500,000원~" }],
+        "Paris": [{ name: "리츠 파리", price: "1,200,000원~" }]
+    };
+
     function initMap() {
-        const defaultLocation = { lat: 37.5665, lng: 126.9780 }; // 서울
+        const defaultLocation = { lat: 37.5665, lng: 126.9780 };
         map = new google.maps.Map(document.getElementById('map'), {
             zoom: 12,
             center: defaultLocation
         });
         marker = new google.maps.Marker({
-            position: defaultLocation,
-            map: map
+            map: map,
+            position: defaultLocation
         });
+
+        // 자동완성 기능 연결
+        const input = document.getElementById('cityInput');
+        autocomplete = new google.maps.places.Autocomplete(input, {
+            types: ['(cities)'] // 도시 단위로 검색 제한
+        });
+
+        // 사용자가 리스트에서 도시를 선택했을 때 실행
+        autocomplete.addListener('place_changed', onPlaceChanged);
     }
 
-    const hotelData = {
-        "서울": [
-            { name: "파크 하얏트 서울", price: "600,000원~", rating: "4.9" },
-            { name: "그랜드 하얏트", price: "350,000원~", rating: "4.7" }
-        ],
-        "파리": [
-            { name: "샹그릴라 파리", price: "1,500,000원~", rating: "5.0" },
-            { name: "호텔 루브르", price: "550,000원~", rating: "4.6" }
-        ]
-    };
+    function onPlaceChanged() {
+        const place = autocomplete.getPlace();
 
-    function searchTrip() {
-        const city = document.getElementById('cityInput').value;
-        const hotelList = document.getElementById('hotelList');
-        hotelList.innerHTML = '';
-
-        let coords;
-        if (city === "서울") {
-            coords = { lat: 37.5665, lng: 126.9780 };
-        } else if (city === "파리") {
-            coords = { lat: 48.8566, lng: 2.3522 };
+        if (!place.geometry) {
+            alert("도시를 목록에서 선택해 주세요.");
+            return;
         }
 
-        if (coords) {
-            // 지도 이동 및 마커 업데이트
-            map.setCenter(coords);
-            marker.setPosition(coords);
-            displayHotels(city);
-        } else {
-            alert("검색 가능한 도시: 서울, 파리");
-        }
+        // 1. 지도 중심 이동 및 마커 설정
+        map.setCenter(place.geometry.location);
+        map.setZoom(13);
+        marker.setPosition(place.geometry.location);
+
+        // 2. 해당 도시의 숙소 표시 (영문 이름 기준 매칭)
+        const cityName = place.name;
+        displayHotels(cityName);
     }
 
     function displayHotels(cityName) {
-        const hotels = hotelData[cityName];
         const hotelList = document.getElementById('hotelList');
-        hotels.forEach(hotel => {
-            hotelList.innerHTML += `
-                <div class="hotel-card">
-                    <h3>${hotel.name}</h3>
-                    <p class="price">최저가: ${hotel.price}</p>
-                    <p>평점: ⭐ ${hotel.rating}</p>
-                </div>
-            `;
-        });
+        hotelList.innerHTML = '';
+
+        // 샘플 데이터에 있는 도시인지 확인 (실제로는 여기서 API 호출)
+        const hotels = hotelData[cityName];
+
+        if (hotels) {
+            hotels.forEach(hotel => {
+                hotelList.innerHTML += `
+                    <div class="hotel-card">
+                        <h3>${hotel.name}</h3>
+                        <p style="color:#28a745">추천 숙소</p>
+                        <p>최저가: ${hotel.price}</p>
+                    </div>
+                `;
+            });
+        } else {
+            hotelList.innerHTML = `<div class="no-data">'${cityName}' 지역의 추천 숙소 데이터를 준비 중입니다.</div>`;
+        }
     }
 </script>
 
