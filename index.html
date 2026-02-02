@@ -2,58 +2,122 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>K-Stock 실시간 차트</title>
+    <title>K-Stock 재무분석기</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; background-color: #131722; color: white; padding: 20px; }
-        .search-bar { margin-bottom: 20px; text-align: center; }
-        input { padding: 10px; width: 250px; border-radius: 4px; border: 1px solid #363c4e; background: #1e222d; color: white; }
-        button { padding: 10px 20px; background: #2962ff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        /* 차트가 들어갈 공간의 높이를 반드시 지정해야 합니다 */
-        #chart_area { height: 100%; width: 100%; margin-top: 10px; border: 1px solid #363c4e; }
+        body { font-family: 'Pretendard', sans-serif; background: #f4f7f9; padding: 20px; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .search-box { display: flex; gap: 10px; margin-bottom: 30px; }
+        input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+        button { padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .chart-card { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 10px; }
+        .summary { grid-column: 1 / -1; background: #e9ecef; padding: 20px; border-radius: 10px; line-height: 1.6; }
+        h3 { margin-top: 0; color: #0056b3; }
     </style>
 </head>
 <body>
 
-    <div class="search-bar">
-        <h2>📈 종목 검색</h2>
-        <input type="text" id="targetCode" placeholder="종목코드 6자리 (예: 005930)">
-        <button onclick="displayStock()">차트 보기</button>
+<div class="container">
+    <h2>📊 기업 재무제표 분석 대시보드</h2>
+    <div class="search-box">
+        <input type="text" id="targetStock" placeholder="종목명 입력 (예: 삼성전자, 네이버)">
+        <button onclick="analyzeStock()">분석 시작</button>
     </div>
 
-    <div id="chart_area"></div>
+    <div class="dashboard" id="analysisResult" style="display: none;">
+        <div class="summary">
+            <h3>📌 기업 분석 요약: <span id="companyName"></span></h3>
+            <p id="analysisText"></p>
+        </div>
 
-    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+        <div class="chart-card">
+            <h4>매출액 및 영업이익 (단위: 조)</h4>
+            <canvas id="revenueChart"></canvas>
+        </div>
 
-    <script>
-        // 차트를 그리는 함수
-        function displayStock() {
-            let code = document.getElementById('targetCode').value.trim();
-            
-            // 아무것도 입력 안 했을 때 기본값 (삼성전자)
-            if (code === "") code = "005930";
+        <div class="chart-card">
+            <h4>부채비율 변화 (%)</h4>
+            <canvas id="debtChart"></canvas>
+        </div>
+    </div>
+</div>
 
-            // 이전 차트를 지우고 새로 그리기 위해 내부를 비움
-            document.getElementById('chart_area').innerHTML = '<div id="tv_widget"></div>';
+<script>
+    // 1. 가상의 재무 데이터베이스 (실제로는 API를 통해 가져와야 함)
+    const financialData = {
+        "삼성전자": {
+            revenue: [236, 279, 302, 258], // 최근 4개년 매출
+            profit: [36, 51, 43, 6],       // 최근 4개년 영업이익
+            debtRatio: [37, 39, 36, 30],   // 부채비율
+            desc: "글로벌 반도체 및 가전 선두 기업입니다. 최근 반도체 업황 회복에 따라 영업이익 반등이 기대됩니다."
+        },
+        "네이버": {
+            revenue: [6.8, 8.2, 9.6, 10.1],
+            profit: [1.3, 1.3, 1.4, 1.6],
+            debtRatio: [45, 48, 52, 50],
+            desc: "국내 최대 포털 서비스로, 커머스와 클라우드 부문의 성장세가 뚜렷합니다. 안정적인 영업이익률을 유지 중입니다."
+        }
+    };
 
-            new TradingView.widget({
-                "autosize": true,
-                "symbol": "KRX:" + code,
-                "interval": "D",
-                "timezone": "Asia/Seoul",
-                "theme": "dark",
-                "style": "1",
-                "locale": "ko",
-                "toolbar_bg": "#f1f3f6",
-                "enable_publishing": false,
-                "allow_symbol_change": true,
-                "container_id": "tv_widget" // 이 ID가 위 DIV의 ID와 같아야 함
-            });
+    let revenueChart, debtChart;
+
+    function analyzeStock() {
+        const name = document.getElementById('targetStock').value.trim();
+        const data = financialData[name];
+
+        if (!data) {
+            alert("현재 '삼성전자'와 '네이버' 데이터만 조회 가능합니다. (데이터 확장 가능)");
+            return;
         }
 
-        // 페이지가 처음 열릴 때 자동으로 삼성전자 차트 보여주기
-        window.onload = function() {
-            displayStock();
-        };
-    </script>
+        // 결과 영역 표시
+        document.getElementById('analysisResult').style.display = 'grid';
+        document.getElementById('companyName').innerText = name;
+        document.getElementById('analysisText').innerText = data.desc;
+
+        // 차트 초기화 및 생성
+        updateCharts(data);
+    }
+
+    function updateCharts(data) {
+        const labels = ['2021', '2022', '2023', '2024(E)'];
+
+        // 기존 차트가 있으면 삭제 (중복 생성 방지)
+        if (revenueChart) revenueChart.destroy();
+        if (debtChart) debtChart.destroy();
+
+        // 매출액/영업이익 차트
+        const ctx1 = document.getElementById('revenueChart').getContext('2d');
+        revenueChart = new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: '매출액', data: data.revenue, backgroundColor: '#007bff' },
+                    { label: '영업이익', data: data.profit, backgroundColor: '#ffc107' }
+                ]
+            }
+        });
+
+        // 부채비율 차트
+        const ctx2 = document.getElementById('debtChart').getContext('2d');
+        debtChart = new Chart(ctx2, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '부채비율',
+                    data: data.debtRatio,
+                    borderColor: '#dc3545',
+                    fill: false,
+                    tension: 0.1
+                }]
+            }
+        });
+    }
+</script>
+
 </body>
 </html>
