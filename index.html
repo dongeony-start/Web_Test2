@@ -3,119 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>나의 여행 플래너</title>
+    <title>Travel Planner - 여행 계획 도우미</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { font-family: 'Arial', sans-serif; margin: 0; background-color: #f4f7f6; }
+        body { font-family: 'Pretendard', sans-serif; margin: 0; padding: 20px; background-color: #f8f9fa; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .search-section { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; }
+        button { padding: 12px 24px; background-color: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; }
         
-        /* 국기 표시 영역 */
-        #flag-container {
-            position: fixed; top: 20px; right: 20px; text-align: center; z-index: 1000;
-            background: white; padding: 10px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        #flag-img { width: 60px; border: 1px solid #eee; display: block; margin-bottom: 5px; }
-        #country-name { font-size: 12px; font-weight: bold; }
-
-        /* 레이아웃 */
-        .header { text-align: center; padding: 20px; background: white; width: 100%; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .input-group { margin-top: 10px; }
-        input { padding: 10px; width: 300px; border: 1px solid #ddd; border-radius: 5px; }
-        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
-
-        .main-content { display: flex; padding: 20px; gap: 20px; height: calc(100vh - 150px); }
+        #map { height: 400px; border-radius: 12px; margin-bottom: 20px; z-index: 1; }
         
-        /* 왼쪽 숙소 리스트 */
-        #hotel-list { width: 300px; background: white; border-radius: 10px; padding: 15px; overflow-y: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .hotel-item { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
-        .hotel-item:last-child { border-bottom: none; }
-        .hotel-item h4 { margin: 0 0 5px 0; color: #007bff; }
-        .hotel-link { font-size: 12px; color: #28a745; text-decoration: none; }
-
-        /* 오른쪽 지도 */
-        #map-container { flex-grow: 1; background: #eee; border-radius: 10px; overflow: hidden; }
-        iframe { width: 100%; height: 100%; border: none; }
+        .recommendations { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .hotel-card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .hotel-card h3 { margin-top: 0; color: #333; }
+        .price { color: #28a745; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="flag-container">
-    <img id="flag-img" src="" alt="Flag">
-    <div id="country-name"></div>
-</div>
-
-<div class="header">
-    <h1>✈️ 여행지 플래너</h1>
-    <div class="input-group">
-        <input type="text" id="destination" placeholder="예: 베트남, 파리, 도쿄" onkeypress="if(event.keyCode==13) updatePage()">
-        <button onclick="updatePage()">검색</button>
+<div class="container">
+    <h2>🌍 어디로 여행을 떠나시나요?</h2>
+    <div class="search-section">
+        <input type="text" id="cityInput" placeholder="도시 이름을 입력하세요 (예: 서울, 파리)">
+        <button onclick="searchTrip()">검색</button>
     </div>
-</div>
 
-<div class="main-content">
-    <div id="hotel-list">
-        <h3>🏨 추천 숙소</h3>
-        <div id="hotel-items">
-            <p>여행지를 검색하면 숙소 정보가 나타납니다.</p>
+    <div id="map"></div>
+
+    <div id="hotelList" class="recommendations">
         </div>
-    </div>
-    <div id="map-container"></div>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    window.onload = () => updatePage('South Korea');
+    // 지도 초기화 (기본 위치: 서울)
+    let map = L.map('map').setView([37.5665, 126.9780], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    let marker;
 
-    async function updatePage(initialValue) {
-        const query = initialValue || document.getElementById('destination').value;
-        if (!query) return;
+    // 가상의 숙소 데이터
+    const hotelData = {
+        "서울": [
+            { name: "시그니엘 서울", price: "500,000원~", rating: "5.0" },
+            { name: "신라 호텔", price: "400,000원~", rating: "4.8" }
+        ],
+        "파리": [
+            { name: "리츠 파리", price: "1,200,000원~", rating: "4.9" },
+            { name: "풀만 파리 투르 에펠", price: "450,000원~", rating: "4.5" }
+        ]
+    };
 
-        // 1. 지도 업데이트
-        document.getElementById('map-container').innerHTML = 
-            `<iframe src="https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed"></iframe>`;
+    function searchTrip() {
+        const city = document.getElementById('cityInput').value;
+        const hotelList = document.getElementById('hotelList');
+        hotelList.innerHTML = ''; // 초기화
 
-        // 2. 국기 정보 가져오기 (보강된 로직)
-        fetchFlag(query);
-
-        // 3. 숙소 정보 업데이트 (임시 데이터 및 사이트 연결)
-        updateHotels(query);
-    }
-
-    async function fetchFlag(query) {
-        const flagContainer = document.getElementById('flag-container');
-        try {
-            // 국기 API는 국가명에 최적화되어 있으므로 검색 결과가 없으면 무시
-            const res = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(query)}`);
-            const data = await res.json();
-            if (data && data.length > 0) {
-                const country = data[0];
-                document.getElementById('flag-img').src = country.flags.png;
-                document.getElementById('country-name').innerText = country.translations.kor ? country.translations.kor.common : country.name.common;
-                flagContainer.style.display = 'block';
-            }
-        } catch (e) {
-            console.log("국가를 직접 찾지 못했습니다.");
-            // 도시명일 경우 국기를 띄우지 않거나, 이전 국기를 유지합니다.
+        if (city === "서울") {
+            updateMap(37.5665, 126.9780, "서울");
+            displayHotels("서울");
+        } else if (city === "파리") {
+            updateMap(48.8566, 2.3522, "파리");
+            displayHotels("파리");
+        } else {
+            alert("현재는 '서울'과 '파리' 검색만 지원합니다. (데이터 확장 가능)");
         }
     }
 
-    function updateHotels(query) {
-        const list = document.getElementById('hotel-items');
-        // 실제 숙박 예약 사이트 검색 결과 링크를 포함한 리스트 생성
-        const sites = [
-            { name: "Agoda", url: `https://www.agoda.com/ko-kr/search?city=${query}` },
-            { name: "Booking.com", url: `https://www.booking.com/searchresults.ko.html?ss=${query}` },
-            { name: "Hotels.com", url: `https://kr.hotels.com/Hotel-Search?destination=${query}` }
-        ];
+    function updateMap(lat, lng, name) {
+        map.setView([lat, lng], 13);
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([lat, lng]).addTo(map).bindPopup(name).openPopup();
+    }
 
-        list.innerHTML = `
-            <div class="hotel-item">
-                <h4>✨ ${query} 인기 숙소 검색</h4>
-                <p>아래 사이트에서 실시간 최저가를 확인하세요:</p>
-                ${sites.map(site => `<a href="${site.url}" target="_blank" class="hotel-link">[ ${site.name}에서 보기 ]</a><br>`).join('')}
-            </div>
-            <div class="hotel-item">
-                <h4>📌 추천 숙소 유형</h4>
-                <p>가족 여행객에게 인기 있는 평점 9.0 이상의 호텔들을 리스트업 해보세요.</p>
-            </div>
-        `;
+    function displayHotels(cityName) {
+        const hotels = hotelData[cityName];
+        const hotelList = document.getElementById('hotelList');
+        
+        hotels.forEach(hotel => {
+            const card = `
+                <div class="hotel-card">
+                    <h3>${hotel.name}</h3>
+                    <p class="price">최저가: ${hotel.price}</p>
+                    <p>평점: ⭐ ${hotel.rating}</p>
+                </div>
+            `;
+            hotelList.innerHTML += card;
+        });
     }
 </script>
 
